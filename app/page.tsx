@@ -1,5 +1,6 @@
 "use client";
 
+import AnimatedMockup from "@/components/AnimatedMockup";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -101,7 +102,6 @@ export default function LandingPage() {
           <h1 className="text-5xl md:text-7xl font-extrabold text-galaxy tracking-tight uppercase flex flex-col items-center justify-center mb-6">
             <span className="mb-3 md:mb-5">TIM DAN AI</span>
             <span className="flex flex-col md:flex-row items-center gap-3 md:gap-4">
-              {/* Ukuran Font Pil Dikecilkan (text-3xl md:text-5xl) agar proporsional */}
               <span className={`inline-flex items-center px-5 py-1.5 md:py-2 md:px-6 rounded-full border border-venus/50 shadow-sm transition-all duration-500 ${currentWord.bg} ${currentWord.textCol}`}>
                 <span className={`w-3 h-3 md:w-4 md:h-4 rounded-full mr-2 md:mr-3 transition-colors duration-500 ${currentWord.dot}`}></span>
                 <span className="text-3xl md:text-5xl tracking-tight mt-1">{currentWord.text}</span>
@@ -114,7 +114,7 @@ export default function LandingPage() {
             Rapat berjam-jam seringkali berakhir dengan catatan mentah dan kebingungan. LockIn membedah kekacauan itu—menyulap transkrip menjadi matriks prioritas yang siap dieksekusi.
           </p>
           
-          <div className="flex justify-center mb-20">
+          <div className="flex justify-center mb-12">
             <Link href="/login" className="bg-planetary text-white px-8 py-3.5 rounded-lg font-semibold text-lg hover:bg-galaxy transition-all shadow-md flex items-center group">
               Mulai Gunakan LockIn
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -122,50 +122,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* 3. HERO MOCKUP */}
-        <div className="max-w-6xl mx-auto px-6 relative">
-          <div className="bg-white rounded-3xl border border-venus/50 shadow-2xl overflow-hidden flex flex-col h-[400px] md:h-[600px]">
-            <div className="h-12 border-b border-venus/30 bg-meteor/80 flex items-center px-4 space-x-2 shrink-0">
-              <div className="w-3 h-3 rounded-full bg-red-400"></div>
-              <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-              <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-              <div className="mx-auto bg-white border border-venus/50 rounded-md px-12 md:px-32 py-1 text-xs text-galaxy/50 font-mono">lockin.app/matrix</div>
-            </div>
-            
-            <div className="flex-1 bg-milkyway/30 flex overflow-hidden">
-              <div className="w-48 lg:w-64 bg-planetary border-r border-venus/20 hidden md:flex flex-col p-4">
-                <div className="flex items-center space-x-2 mb-8 mt-2">
-                  <div className="w-6 h-6 bg-sky rounded-md"></div>
-                  <div className="h-5 w-24 bg-white/20 rounded"></div>
-                </div>
-                <div className="space-y-3">
-                  <div className="h-8 w-full bg-white/10 rounded-md"></div>
-                  <div className="h-8 w-full bg-white/5 rounded-md"></div>
-                  <div className="h-8 w-5/6 bg-white/5 rounded-md"></div>
-                </div>
-              </div>
-
-              <div className="flex-1 p-4 md:p-8 overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <div className="h-6 w-48 bg-galaxy/20 rounded mb-2"></div>
-                    <div className="h-4 w-64 bg-galaxy/10 rounded"></div>
-                  </div>
-                  <div className="h-10 w-24 bg-planetary rounded-lg shadow-sm"></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 flex-1">
-                  <div className="bg-white rounded-xl shadow-sm border border-red-100 p-4">
-                    <div className="flex items-center gap-2 mb-4"><div className="w-3 h-3 rounded-full bg-red-500"></div><div className="h-4 w-24 bg-galaxy/30 rounded"></div></div>
-                    <div className="space-y-3"><div className="h-16 w-full bg-red-50/50 rounded-lg border border-red-50"></div></div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-universe/20 p-4">
-                    <div className="flex items-center gap-2 mb-4"><div className="w-3 h-3 rounded-full bg-universe"></div><div className="h-4 w-24 bg-galaxy/30 rounded"></div></div>
-                    <div className="space-y-3"><div className="h-16 w-full bg-sky/20 rounded-lg border border-sky/30"></div></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* 3. HERO MOCKUP (DIPERBARUI DENGAN ANIMATED MOCKUP) */}
+        <div className="max-w-5xl mx-auto px-6 relative">
+          <AnimatedMockup />
         </div>
       </main>
 
@@ -234,7 +193,7 @@ export default function LandingPage() {
                 <div className="w-full max-w-md animate-in fade-in slide-in-from-right-8 duration-500">
                   <div className="bg-meteor/50 rounded-2xl p-6 border border-venus/30 mb-4">
                      <p className="text-xs text-galaxy/50 mb-2 font-mono">Teks Mentah:</p>
-                     <p className="text-sm text-galaxy/80">"Tolong buatkan presentasi UI untuk besok, lalu jadwalkan meeting dengan Rama minggu depan..."</p>
+                     <p className="text-sm text-galaxy/80">&quot;Tolong buatkan presentasi UI untuk besok, lalu jadwalkan meeting dengan Rama minggu depan...&quot;</p>
                   </div>
                   <div className="flex justify-center my-4"><Sparkles className="w-6 h-6 text-planetary animate-pulse" /></div>
                   <div className="bg-white rounded-xl p-4 border border-planetary/30 shadow-sm flex items-center gap-3">
