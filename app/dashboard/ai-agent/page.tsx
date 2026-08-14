@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useTransition } from "react";
 import { Send, Bot, User, Loader2, Sparkles, BrainCircuit, CheckCircle2, CalendarDays, StickyNote, Folder, Mic, Square, ScreenShare } from "lucide-react";
 import { getChatHistory, askAI, saveTriageResult } from "@/app/actions/ai";
 import { getProjects } from "@/app/actions/task";
-
+export const dynamic = "force-dynamic";
 export default function AiAgentPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);

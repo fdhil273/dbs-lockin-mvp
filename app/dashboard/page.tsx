@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Clock, ArrowUpRight, ArrowDownRight, Sparkles } from "lucide-react";
-
+export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   // 1. CEK SIAPA YANG SEDANG LOGIN
   const cookieStore = await cookies();
