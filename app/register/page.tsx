@@ -45,7 +45,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-6 text-center">
             <Link href="/" className="flex items-center space-x-3 mb-4 hover:opacity-80 transition-opacity">
-              <Image src="/logo.png" alt="LockIn Logo" width={32} height={32} className="object-contain" />
+              <Image src="/logo_Lockin.png" alt="LockIn Logo" width={32} height={32} className="object-contain" />
               <span className="text-xl font-bold text-planetary tracking-widest uppercase">LockIn</span>
             </Link>
             <h1 className="text-2xl md:text-3xl font-extrabold text-galaxy mb-2 tracking-tight">Buat Akun Baru</h1>
