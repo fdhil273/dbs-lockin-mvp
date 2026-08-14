@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String?
+  password      String          
+  projectsOwned Project[]       @relation("ProjectOwner")
+  memberships   ProjectMember[]
+  tasks         Task[]
+  notes         Note[]
+  aiChats       AiChat[]        // (BARU) Relasi ke riwayat AI
+}
+
+model Project {
+  id          String          @id @default(uuid())
+  name        String
+  ownerId     String
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+  tasks       Task[]
+  notes       Note[]
+  createdAt   DateTime        @default(now())
+}
+
+model ProjectMember {
+  id        String  @id @default(uuid())
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId]) 
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  quadrant    String    // Q1, Q2, Q3, Q4 (Dipakai untuk Category)
+  status      String    @default("TODO")
+  
+  type        String    @default("TASK") // (BARU) Pemisah antara Tugas dan Acara
+  
+  dueDate     DateTime? // form "From"
+  endDate     DateTime? // form "To"
+  note        String?   // form "Note"
+
+  completedAt DateTime? // Untuk grafik tren produktivitas di Dashboard
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id          String    @id @default(uuid())
+  title       String
+  content     String?   @db.Text 
+  aiSummary   String?   @db.Text 
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?   
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+// (BARU) Tabel khusus untuk menyimpan riwayat interaksi AI
+model AiChat {
+  id          String    @id @default(uuid())
+  prompt      String    @db.Text
+  response    String    @db.Text
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+}

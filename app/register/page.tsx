@@ -1,0 +1,120 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight, LayoutGrid, Sparkles, Quote, Loader2, AlertCircle } from "lucide-react";
+import { registerUser } from "@/app/actions/auth";
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    if (!username || !email || !password) {
+      setError("Semua kolom wajib diisi.");
+      setIsLoading(false);
+      return;
+    }
+
+    const result = await registerUser(username, email, password);
+    
+    if (result?.error) {
+      setError(result.error); 
+      setIsLoading(false);
+    } else {
+      router.push("/login"); 
+    }
+  };
+
+  return (
+    // DIKUNCI MENGGUNAKAN h-screen dan overflow-hidden
+    <div className="h-screen w-full flex flex-col md:flex-row-reverse font-sans selection:bg-planetary selection:text-white overflow-hidden">
+      
+      {/* SISI KANAN: Formulir */}
+      <div className="w-full md:w-1/2 h-full flex items-center justify-center p-6 lg:p-10 bg-white overflow-y-auto">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center mb-6 text-center">
+            <Link href="/" className="flex items-center space-x-3 mb-4 hover:opacity-80 transition-opacity">
+              <Image src="/logo.png" alt="LockIn Logo" width={32} height={32} className="object-contain" />
+              <span className="text-xl font-bold text-planetary tracking-widest uppercase">LockIn</span>
+            </Link>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-galaxy mb-2 tracking-tight">Buat Akun Baru</h1>
+            <p className="text-galaxy/60 text-sm">Bergabunglah untuk memulai produktivitas tanpa batas.</p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-600 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p className="text-sm font-semibold">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-bold text-galaxy mb-1.5 ml-1">Nama Lengkap</label>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Nama Anda" className="w-full bg-meteor/30 border border-venus/50 rounded-xl px-4 py-3 text-sm text-galaxy focus:outline-none focus:ring-2 focus:ring-planetary/50" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-galaxy mb-1.5 ml-1">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alamat@email.com" className="w-full bg-meteor/30 border border-venus/50 rounded-xl px-4 py-3 text-sm text-galaxy focus:outline-none focus:ring-2 focus:ring-planetary/50" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-galaxy mb-1.5 ml-1">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Buat password yang kuat" className="w-full bg-meteor/30 border border-venus/50 rounded-xl px-4 py-3 text-sm text-galaxy focus:outline-none focus:ring-2 focus:ring-planetary/50" />
+            </div>
+            
+            <button type="submit" disabled={isLoading} className={`w-full text-white rounded-xl px-5 py-3.5 font-bold text-base transition-all shadow-md flex items-center justify-center group mt-6 ${isLoading ? "bg-galaxy cursor-not-allowed opacity-80" : "bg-planetary hover:bg-galaxy"}`}>
+              {isLoading ? <><Loader2 className="w-5 h-5 mr-3 animate-spin" /> Mendaftarkan...</> : <><ArrowRight className="mr-2 w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Daftar Sekarang</>}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm font-medium text-galaxy/70">
+            Sudah memiliki akun? <Link href="/login" className="text-planetary hover:text-universe font-bold transition-colors">Masuk Di Sini</Link>
+          </div>
+        </div>
+      </div>
+
+      {/* SISI KIRI: Visual (Skala disesuaikan agar muat) */}
+      <div className="hidden md:flex w-1/2 h-full bg-milkyway relative flex-col items-center justify-center p-8 lg:p-12 overflow-hidden border-r border-venus/30 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]">
+        <div className="absolute top-0 left-0 w-full h-full bg-planetary/[0.02] pointer-events-none z-0"></div>
+        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-planetary/15 blur-[100px] rounded-full"></div>
+        
+        <div className="relative z-10 w-full max-w-sm mb-6">
+          <div className="bg-white p-5 rounded-3xl shadow-2xl border border-venus/40 hover:scale-105 transition-transform duration-500">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-universe rounded-2xl flex items-center justify-center text-white shadow-inner"><LayoutGrid className="w-5 h-5" /></div>
+              <div><p className="text-sm font-bold text-galaxy">Priority Matrix</p><p className="text-xs text-galaxy/50">Sistem 4 Kuadran Otomatis</p></div>
+              <Sparkles className="w-4 h-4 text-planetary ml-auto animate-pulse" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-red-50 h-20 rounded-2xl border border-red-100 p-3"><div className="w-2.5 h-2.5 rounded-full bg-red-500 mb-2 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div><div className="h-1.5 w-full bg-red-200 rounded mb-1.5"></div><div className="h-1.5 w-1/2 bg-red-200 rounded"></div></div>
+              <div className="bg-blue-50 h-20 rounded-2xl border border-blue-100 p-3"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 mb-2 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div><div className="h-1.5 w-full bg-blue-200 rounded"></div></div>
+              <div className="bg-amber-50 h-20 rounded-2xl border border-amber-100 p-3"><div className="w-2.5 h-2.5 rounded-full bg-amber-500 mb-2 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div><div className="h-1.5 w-2/3 bg-amber-200 rounded"></div></div>
+              <div className="bg-slate-50 h-20 rounded-2xl border border-slate-200 p-3"><div className="w-2.5 h-2.5 rounded-full bg-slate-400 mb-2"></div><div className="h-1.5 w-3/4 bg-slate-300 rounded"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 w-full max-w-sm mt-2 bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white shadow-md transform -rotate-1">
+          <Quote className="w-6 h-6 text-universe/30 mb-2" />
+          <p className="text-sm text-galaxy/80 font-medium italic mb-4 leading-relaxed">"Ajaib. Saya cukup paste catatan rapat yang sangat panjang, dan tiba-tiba semuanya berubah menjadi target kerja yang terstruktur."</p>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-sky flex items-center justify-center text-planetary text-xs font-bold shadow-inner">A</div>
+            <div><p className="text-xs font-bold text-galaxy">Andi S.</p><p className="text-[10px] text-galaxy/50 uppercase tracking-widest font-semibold mt-0.5">Software Engineer</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
