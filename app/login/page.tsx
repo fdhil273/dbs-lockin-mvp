@@ -45,7 +45,7 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-8 text-center">
             <Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity">
               {/* Pastikan file logo.png ada di dalam folder public */}
-              <Image src="/logo.png" alt="LockIn Logo" width={32} height={32} className="object-contain" />
+              <Image src="/logo_Lockin.png" alt="LockIn Logo" width={32} height={32} className="object-contain" />
               <span className="text-2xl font-bold text-planetary tracking-widest uppercase">LockIn</span>
             </Link>
             <h1 className="text-3xl font-extrabold text-galaxy mb-2 tracking-tight">Selamat Datang</h1>
