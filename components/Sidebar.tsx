@@ -70,7 +70,12 @@ export default function Sidebar() {
       </div>
 
       <div className="p-3">
-        <div className={`bg-white/10 rounded-2xl flex items-center group hover:bg-white/15 transition-colors cursor-pointer mb-2 ${isCollapsed ? "p-2 justify-center" : "p-3 justify-between"}`}>
+        {/* PERBAIKAN: Mengubah div menjadi Link agar mengarah ke halaman settings */}
+        <Link 
+          href="/dashboard/settings" 
+          title={isCollapsed ? "Pengaturan" : ""}
+          className={`bg-white/10 rounded-2xl flex items-center group hover:bg-white/15 transition-colors cursor-pointer mb-2 ${isCollapsed ? "p-2 justify-center" : "p-3 justify-between"}`}
+        >
           <div className="flex items-center overflow-hidden">
             <div className="w-10 h-10 rounded-full bg-milkyway text-planetary flex items-center justify-center font-bold text-lg shrink-0">F</div>
             {!isCollapsed && (
@@ -81,7 +86,7 @@ export default function Sidebar() {
             )}
           </div>
           {!isCollapsed && <Settings className="w-4 h-4 text-sky/70 group-hover:text-white shrink-0 ml-2" />}
-        </div>
+        </Link>
         
         <Link href="/" title={isCollapsed ? "Logout" : ""} className={`w-full flex items-center py-3 text-sky/70 hover:bg-red-500/20 hover:text-red-300 rounded-xl font-medium transition-colors ${isCollapsed ? "justify-center px-0" : "px-4 justify-center"}`}>
           <LogOut className={`w-5 h-5 ${isCollapsed ? "" : "mr-3"} shrink-0`} />

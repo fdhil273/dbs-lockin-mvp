@@ -12,6 +12,7 @@ model User {
   id            String          @id @default(uuid())
   email         String          @unique
   name          String?
+  birthDate     String?
   password      String          
   projectsOwned Project[]       @relation("ProjectOwner")
   memberships   ProjectMember[]
@@ -77,14 +78,14 @@ model Note {
   createdAt   DateTime  @default(now())
 }
 
-// (BARU) Tabel khusus untuk menyimpan riwayat interaksi AI
 model AiChat {
-  id          String    @id @default(uuid())
-  prompt      String    @db.Text
-  response    String    @db.Text
-  
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // <-- INI BARIS YANG KURANG
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+
+  sessionId String?  
+  title     String?  
 }

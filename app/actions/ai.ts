@@ -1,166 +1,158 @@
-"use server"
+"use server";
 
-import { prisma } from "@/lib/prisma"
-import { cookies } from "next/headers"
-import { revalidatePath } from "next/cache"
-
-async function getCurrentUserId() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("lockin_user_id")?.value;
-  if (!userId) throw new Error("Anda belum login!")
-  return userId
-}
-
-export async function getChatHistory() {
-  const userId = await getCurrentUserId();
-  return await prisma.aiChat.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'asc' }
-  });
-}
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
 // ==========================================
-// FUNGSI 1: SIMPAN HASIL TRIAGE SEKALIGUS
+// 1. MENDAPATKAN USER ID
 // ==========================================
-export async function saveTriageResult(triageData: any, projectId?: string) {
-  const userId = await getCurrentUserId();
-
-  if (triageData.summary || triageData.notes) {
-    try {
-      await prisma.note.create({
-        data: {
-          title: "AI Triage: Meeting Summary",
-          content: `**SUMMARY:**\n${triageData.summary}\n\n**NOTES:**\n${triageData.notes}`,
-          userId,
-          projectId: projectId || null
-        }
-      });
-    } catch (error) {
-      console.error("Gagal menyimpan Note:", error);
-    }
-  }
-
-  if (triageData.tasks && triageData.tasks.length > 0) {
-    for (const t of triageData.tasks) {
-      await prisma.task.create({
-        data: {
-          title: t.title,
-          quadrant: t.quadrant || "Q2",
-          type: "TASK",
-          dueDate: t.dueDate ? new Date(t.dueDate) : null,
-          userId,
-          projectId: projectId || null
-        }
-      });
-    }
-  }
-
-  if (triageData.events && triageData.events.length > 0) {
-    for (const e of triageData.events) {
-      await prisma.task.create({
-        data: {
-          title: e.title,
-          quadrant: "Q2",
-          type: "EVENT",
-          dueDate: e.fromDate ? new Date(e.fromDate) : null,
-          endDate: e.toDate ? new Date(e.toDate) : null,
-          userId,
-          projectId: projectId || null
-        }
-      });
-    }
-  }
-
-  revalidatePath('/dashboard/task');
-  revalidatePath('/dashboard/jadwal');
-  revalidatePath('/dashboard/notes');
-  revalidatePath('/dashboard');
-  return { success: true };
-}
-
-
-// ==========================================
-// FUNGSI 2: ASK AI (GEMINI 3.6 FLASH)
-// ==========================================
-export async function askAI(prompt: string) {
-  const userId = await getCurrentUserId();
-  
-  const systemPrompt = `
-    Kamu adalah "LockIn AI", asisten Triage Produktivitas.
-    Tugasmu memproses transkrip meeting/instruksi dan mengubahnya menjadi struktur JSON.
-    
-    ATURAN MUTLAK:
-    1. KELUARKAN HANYA FORMAT JSON MURNI TANPA BLOK KODE (tanpa \`\`\`json).
-    2. Quadrant HANYA BOLEH bernilai: "Q1", "Q2", "Q3", atau "Q4".
-    
-    SKEMA JSON YANG WAJIB DIGUNAKAN:
-    {
-      "isTriage": true,
-      "summary": "Ringkasan singkat dari meeting...",
-      "notes": "Catatan tambahan atau detail spesifik...",
-      "tasks": [
-        { "title": "Nama tugas", "quadrant": "Q1", "dueDate": "2026-08-20T09:00:00Z" }
-      ],
-      "events": [
-        { "title": "Nama jadwal", "fromDate": "2026-08-21T10:00:00Z", "toDate": "2026-08-21T12:00:00Z" }
-      ]
-    }
-  `;
-
+const getUserId = async () => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const anyUser = await prisma.user.findFirst();
+    return anyUser ? anyUser.id : null;
+  } catch (e) { return null; }
+};
+
+// ==========================================
+// 2. MENGAMBIL DAFTAR SESI UNTUK SIDEBAR
+// ==========================================
+export async function getSidebarSessions() {
+  try {
+    const userId = await getUserId();
+    if (!userId) return [];
     
-    // 🔥 PERUBAHAN FINAL: Menggunakan model Gemini 3.6 Flash yang sesuai dengan timeline 2026!
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-        }
-      })
+    const chats = await prisma.aiChat.findMany({ 
+      where: { userId }, 
+      orderBy: { createdAt: 'desc' } 
     });
 
-    const data = await response.json();
+    const sessionsMap = new Map();
+    chats.forEach(chat => {
+      const sId = chat.sessionId || chat.id;
+      if (!sessionsMap.has(sId)) {
+        sessionsMap.set(sId, {
+          id: sId,
+          title: chat.title || chat.prompt.substring(0, 25) + "...",
+          createdAt: chat.createdAt
+        });
+      }
+    });
+    return Array.from(sessionsMap.values());
+  } catch (error) { return []; }
+}
 
-    if (!response.ok) {
-      console.error("Gemini API Error:", data);
-      return JSON.stringify({ 
-        isTriage: false, 
-        message: `⚠️ Error Google: ${data.error?.message}` 
-      });
-    }
-
-    let aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+// ==========================================
+// 3. MENGAMBIL OBROLAN DALAM SATU SESI
+// ==========================================
+export async function getSessionChats(sessionId: string) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return [];
     
-    if (!aiResponse) {
-      return JSON.stringify({ isTriage: false, message: "⚠️ AI menolak merespons." });
-    }
+    const chats = await prisma.aiChat.findMany({
+      where: { userId, OR: [{ sessionId: sessionId }, { id: sessionId }] },
+      orderBy: { createdAt: 'asc' } 
+    });
 
-    // Pembersihan ekstra
-    aiResponse = aiResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+    return chats.map(chat => {
+      let parsedResponse;
+      try { parsedResponse = JSON.parse(chat.response); } 
+      catch (e) { parsedResponse = { message: chat.response }; }
+      return { id: chat.id, prompt: chat.prompt, triageData: parsedResponse, createdAt: chat.createdAt };
+    });
+  } catch (error) { return []; }
+}
+
+// ==========================================
+// 4. MENYIMPAN CHAT BARU
+// ==========================================
+export async function saveAiChat(prompt: string, responseJson: any, sessionId?: string) {
+  try {
+    const userId = await getUserId();
+    if (!userId) throw new Error("Unauthorized");
+
+    let activeSessionId = sessionId;
+    let sessionTitle = prompt.substring(0, 25) + "...";
     
-    try {
-      const parsedData = JSON.parse(aiResponse);
-      parsedData.isTriage = true; 
-      aiResponse = JSON.stringify(parsedData);
-    } catch (parseError) {
-      console.error("Gagal parse JSON:", parseError);
-      return JSON.stringify({ 
-        isTriage: false, 
-        message: "AI merespons dengan format yang salah:\n" + aiResponse 
-      });
+    // Pertahankan judul jika ini sesi lanjutan
+    if (activeSessionId) {
+        const existing = await prisma.aiChat.findFirst({
+            where: { userId, OR: [{ sessionId: activeSessionId }, { id: activeSessionId }] }
+        });
+        if (existing && existing.title) sessionTitle = existing.title;
+    } else {
+        activeSessionId = crypto.randomUUID(); // Menggunakan bawaan Node.js, tanpa package external!
     }
 
     await prisma.aiChat.create({
-      data: { prompt, response: aiResponse, userId }
+      data: {
+        userId, prompt, response: JSON.stringify(responseJson),
+        sessionId: activeSessionId, title: sessionTitle
+      }
     });
+    return { success: true, sessionId: activeSessionId };
+  } catch (error) { return { success: false }; }
+}
 
-    return aiResponse;
-  } catch (error: any) {
-    console.error("Fetch Error:", error);
-    return JSON.stringify({ isTriage: false, message: `⚠️ Sistem Gagal: ${error.message}` });
-  }
+// ==========================================
+// 5. CRUD SIDEBAR (RENAME & DELETE)
+// ==========================================
+export async function renameSession(sessionId: string, newTitle: string) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { success: false };
+    await prisma.aiChat.updateMany({
+      where: { userId, OR: [{ sessionId: sessionId }, { id: sessionId }] },
+      data: { title: newTitle }
+    });
+    return { success: true };
+  } catch (error) { return { success: false }; }
+}
+
+export async function deleteSession(sessionId: string) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { success: false };
+    await prisma.aiChat.deleteMany({
+      where: { userId, OR: [{ sessionId: sessionId }, { id: sessionId }] }
+    });
+    return { success: true };
+  } catch (error) { return { success: false }; }
+}
+
+// ==========================================
+// 6. MENYIMPAN HASIL AI KE TABEL TASK/EVENT
+// ==========================================
+export async function saveTriageResult(data: any, projectId: string | null) {
+  try {
+    const userId = await getUserId();
+    if (!userId) throw new Error("Unauthorized");
+    const validProjectId = projectId && projectId.trim() !== "" ? projectId : null;
+
+    // Simpan Ringkasan ke Notes
+    if (data.message || data.summary) {
+      await prisma.note.create({ data: { title: "AI Meeting Summary", content: data.message || data.summary, aiSummary: data.message || data.summary, userId, projectId: validProjectId } });
+    }
+    
+    // Simpan Tugas beserta Tanggalnya (jika ada)
+    if (data.tasks && Array.isArray(data.tasks)) {
+      const taskPromises = data.tasks.map((task: any) => {
+        const noteContent = task.assignee ? `Ditugaskan kepada: ${task.assignee}` : null;
+        const parsedDate = task.dueDate ? new Date(task.dueDate) : null;
+        return prisma.task.create({ data: { title: task.title, quadrant: task.quadrant || "Q4", status: "TODO", type: "TASK", note: noteContent, dueDate: parsedDate, userId, projectId: validProjectId }});
+      });
+      await Promise.all(taskPromises);
+    }
+    
+    // Simpan Jadwal/Event beserta Tanggalnya
+    if (data.events && Array.isArray(data.events)) {
+      const eventPromises = data.events.map((event: any) => {
+        const parsedDate = event.date ? new Date(event.date) : null;
+        return prisma.task.create({ data: { title: event.title, quadrant: "Q2", status: "TODO", type: "EVENT", dueDate: parsedDate, userId, projectId: validProjectId }});
+      });
+      await Promise.all(eventPromises);
+    }
+    
+    return { success: true, message: "Tersimpan!" };
+  } catch (error) { throw new Error("Gagal menyimpan ke DB"); }
 }

@@ -1,378 +1,319 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
-import { Send, Bot, User, Loader2, Sparkles, BrainCircuit, CheckCircle2, CalendarDays, StickyNote, Folder, Mic, Square, ScreenShare } from "lucide-react";
-import { getChatHistory, askAI, saveTriageResult } from "@/app/actions/ai";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
+import { 
+  Mic, MonitorUp, History, Send, Plus, 
+  MessageSquare, StopCircle, PanelLeftClose, 
+  PanelLeftOpen, User, RotateCw, Edit3, CalendarDays, 
+  Folder, CheckCircle2, Loader2, Search, Pencil, Trash2, Check, X
+} from "lucide-react";
+
+import { getSidebarSessions, getSessionChats, saveTriageResult, renameSession, deleteSession } from "@/app/actions/ai";
 import { getProjects } from "@/app/actions/task";
-export const dynamic = "force-dynamic";
-export default function AiAgentPage() {
-  const [messages, setMessages] = useState<any[]>([]);
+
+export default function AIAgentWorkspace() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionChats, setSessionChats] = useState<any[]>([]); 
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitleValue, setEditTitleValue] = useState("");
+
+  const [inputText, setInputText] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordMode, setRecordMode] = useState<"mic" | "screen" | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  
   const [projects, setProjects] = useState<any[]>([]);
-  const [inputData, setInputData] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const [isLoadingFetch, setIsLoadingFetch] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  // State untuk Perekam Suara & Deepgram
-  const [isListening, setIsListening] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState("disconnected"); // disconnected, connecting, connected
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
-  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const fetchData = async () => {
-    setIsLoadingFetch(true);
-    const [history, projData] = await Promise.all([getChatHistory(), getProjects()]);
-    setMessages(history);
-    setProjects(projData);
-    setIsLoadingFetch(false);
-    scrollToBottom();
+  const fetchSidebar = async () => {
+    const history = await getSidebarSessions();
+    setSessions(history);
   };
 
-  useEffect(() => { fetchData(); }, []);
-
-  // Pastikan mematikan semua saat komponen di-unmount
   useEffect(() => {
-    return () => {
-      stopListening();
-    };
+    fetchSidebar();
+    getProjects().then(p => { if (p) setProjects(p); });
   }, []);
 
-  const scrollToBottom = () => {
-    setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, 100);
+  useEffect(() => {
+    if (activeSessionId) {
+      if (activeSessionId === "loading") return;
+      getSessionChats(activeSessionId).then(chats => {
+        setSessionChats(chats);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+    } else {
+      setSessionChats([]);
+    }
+  }, [activeSessionId]);
+
+  const handleRename = async (id: string) => {
+    if (editTitleValue.trim() === "") {
+        setEditingSessionId(null);
+        return;
+    }
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, title: editTitleValue } : s));
+    setEditingSessionId(null);
+    await renameSession(id, editTitleValue);
   };
 
-  // ==========================================
-  // FITUR AI MEETING (DEEPGRAM SCREEN SHARE AUDIO)
-  // ==========================================
-  const toggleListening = () => {
-    if (isListening || connectionStatus === "connecting") {
-      stopListening();
-    } else {
-      startDeepgramSession();
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("Hapus obrolan ini?")) {
+      setSessions(prev => prev.filter(s => s.id !== id));
+      if (activeSessionId === id) setActiveSessionId(null);
+      await deleteSession(id);
     }
   };
 
-  const startDeepgramSession = async () => {
+  const filteredSessions = sessions.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const processMessage = async (textToSend: string) => {
+    if (!textToSend.trim() || isProcessing) return;
+    
+    // Matikan rekaman jika sedang aktif
+    if (isRecording) handleStopRecording();
+
+    setIsProcessing(true);
+    setInputText("");
+    
+    const tempUserChat = { id: Date.now().toString(), prompt: textToSend, triageData: null };
+    setSessionChats(prev => [...prev, tempUserChat]);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+
     try {
-      setConnectionStatus("connecting");
-      const apiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY;
-      if (!apiKey) {
-        alert("Deepgram API Key tidak ditemukan di .env");
-        setConnectionStatus("disconnected");
-        return;
-      }
-
-      // 1. Minta akses Screen/Tab Audio
-      // Penting: Pengguna harus memilih tab Google Meet dan MENCENTANG "Share tab audio"
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: "browser" }, // Hanya perlu untuk memicu permintaan audio browser
-        audio: true
+      const res = await fetch('/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: textToSend, sessionId: activeSessionId })
       });
-      audioStreamRef.current = stream;
+      
+      if (!res.ok) throw new Error("Gagal mengambil respon");
+      
+      const data = await res.json();
+      
+      if (data.sessionId && data.sessionId !== activeSessionId) {
+        setActiveSessionId(data.sessionId);
+        await fetchSidebar(); 
+      } else {
+        setSessionChats(prev => [...prev, { id: Date.now().toString(), prompt: null, triageData: data }]);
+      }
+    } catch (error) {
+      alert("Koneksi terputus. Silakan coba lagi.");
+      setSessionChats(prev => prev.filter(c => c.id !== tempUserChat.id));
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  };
 
-      // 2. Buat koneksi WebSocket ke Deepgram (Nova-3, Bahasa Indonesia)
-      // model=nova-3 & language=id
-      const socket = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-3&language=id&smart_format=true', [
-        'token', apiKey
-      ]);
-      socketRef.current = socket;
+  const handleStartRecording = async (mode: "mic" | "screen") => {
+    try {
+      let stream: MediaStream;
+      if (mode === "mic") stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      else stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      
+      streamRef.current = stream;
+      setRecordMode(mode);
+      setIsRecording(true);
+      setLiveTranscript("");
 
-      socket.onopen = () => {
-        setConnectionStatus("connected");
-        setIsListening(true);
-        
-        // 3. Tangkap audio dan kirim ke Deepgram
-        // Menggunakan MediaRecorder untuk memecah audio menjadi *chunks*
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = mediaRecorder;
+      const DEEPGRAM_KEY = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY;
+      socketRef.current = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&language=id', ['token', DEEPGRAM_KEY as string]);
 
-        mediaRecorder.addEventListener('dataavailable', (event) => {
-          if (event.data.size > 0 && socket.readyState === 1) {
-            socket.send(event.data);
-          }
+      socketRef.current.onopen = () => {
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+        mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        mediaRecorderRef.current.addEventListener('dataavailable', (e) => {
+          if (e.data.size > 0 && socketRef.current?.readyState === 1) socketRef.current.send(e.data);
         });
-
-        // Kirim potongan audio setiap 250 milidetik
-        mediaRecorder.start(250);
+        mediaRecorderRef.current.start(250); 
       };
 
-      socket.onmessage = (message) => {
+      socketRef.current.onmessage = (message) => {
         const received = JSON.parse(message.data);
-        const transcript = received.channel?.alternatives[0]?.transcript;
-        
-        // Deepgram mengirim hasil interim (sementara) dan final.
-        // Kita hanya mengambil yang sudah final agar teksnya stabil.
-        if (transcript && received.is_final) {
-          setInputData(prev => {
-            const separator = prev.trim() ? " " : "";
-            return (prev + separator + transcript).trim();
-          });
+        if (received.type === 'Results') {
+          const transcript = received.channel.alternatives[0]?.transcript;
+          if (transcript) setLiveTranscript(prev => prev + " " + transcript);
         }
       };
-
-      socket.onclose = () => {
-        stopListening();
-      };
-
-      socket.onerror = (error) => {
-        console.error("Deepgram Error:", error);
-        stopListening();
-      };
-
-      // Matikan perekaman jika user mengeklik "Stop Sharing" di browser UI
-      stream.getTracks().forEach(track => {
-        track.onended = () => stopListening();
-      });
-
-    } catch (err) {
-      console.error("Gagal mendapatkan akses layar/audio:", err);
-      alert("Harap izinkan akses Screen Share dan pastikan 'Share Tab Audio' dicentang.");
-      setConnectionStatus("disconnected");
-    }
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => handleStopRecording());
+    } catch (error) { alert("Akses dibatalkan."); }
   };
 
-  const stopListening = () => {
-    setIsListening(false);
-    setConnectionStatus("disconnected");
-    
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(t => t.stop());
-    }
-  };
-  // ==========================================
-
-  const handleSend = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputData.trim()) return;
-
-    if (isListening) stopListening();
-
-    const userMessage = inputData;
-    setInputData("");
-
-    setMessages(prev => [...prev, { prompt: userMessage, response: "", isTemporary: true }]);
-    scrollToBottom();
-
-    startTransition(async () => {
-      const aiResponse = await askAI(userMessage);
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        newMsgs[newMsgs.length - 1] = { prompt: userMessage, response: aiResponse };
-        return newMsgs;
-      });
-      scrollToBottom();
-    });
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+    if (socketRef.current) socketRef.current.close();
+    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+    setIsRecording(false);
+    setRecordMode(null);
+    if (liveTranscript.trim()) setInputText(prev => prev + " " + liveTranscript.trim());
+    setLiveTranscript("");
   };
 
-  const TriageCard = ({ data, msgIndex }: { data: any, msgIndex: number }) => {
+  const TriageCard = ({ data }: { data: any }) => {
     const [selectedProject, setSelectedProject] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
 
     const handleApprove = async () => {
       setIsSaving(true);
-      await saveTriageResult(data, selectedProject);
-      setIsSaving(false);
-      setIsSaved(true);
+      try { await saveTriageResult(data, selectedProject); setIsSaved(true); } 
+      catch (error) { alert("Gagal menyimpan ke Database."); } 
+      finally { setIsSaving(false); }
     };
 
-    if (isSaved) {
-      return (
-        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h4 className="font-bold text-emerald-800 text-sm">Triage Disetujui & Disimpan!</h4>
-            <p className="text-xs text-emerald-600">Catatan, Tugas, dan Jadwal telah ditambahkan ke database.</p>
-          </div>
-        </div>
-      );
-    }
+    if (!data) return null;
 
     return (
-      <div className="bg-white border border-venus/60 rounded-2xl overflow-hidden shadow-sm mt-2 w-full md:min-w-[400px]">
-        <div className="bg-[#1e3a8a] px-4 py-3 text-white flex items-center gap-2">
-          <BrainCircuit className="w-5 h-5" />
-          <h4 className="font-bold text-sm">Hasil Triage AI (Menunggu Validasi)</h4>
-        </div>
-        
-        <div className="p-4 space-y-4">
-          <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
-            <div className="flex items-center gap-2 mb-1 text-amber-800"><StickyNote className="w-4 h-4"/> <span className="font-bold text-xs">Summary & Notes</span></div>
-            <p className="text-xs text-amber-900 leading-relaxed">{data.summary}</p>
-          </div>
-
-          {data.tasks && data.tasks.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2 text-sky-800"><CheckCircle2 className="w-4 h-4"/> <span className="font-bold text-xs">Tugas Terdeteksi ({data.tasks.length})</span></div>
-              <div className="space-y-2">
-                {data.tasks.map((t: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 bg-sky-50 px-3 py-2 rounded-lg text-xs text-sky-900 border border-sky-100">
-                    <span className="font-bold bg-white px-2 py-0.5 rounded shadow-sm">{t.quadrant}</span> {t.title}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {data.events && data.events.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2 text-indigo-800"><CalendarDays className="w-4 h-4"/> <span className="font-bold text-xs">Jadwal Terdeteksi ({data.events.length})</span></div>
-              <div className="space-y-2">
-                {data.events.map((e: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg text-xs text-indigo-900 border border-indigo-100">
-                    📅 {e.title}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-[#F8F9FB] p-4 border-t border-venus/50 flex flex-col gap-3">
+      <div className="relative bg-white border border-gray-200 p-5 rounded-2xl rounded-tl-none shadow-sm space-y-4 w-full">
+        {isSaved && (<div className="absolute top-4 right-4 bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Tersimpan</div>)}
+        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100"><p className="text-gray-800 leading-relaxed">{data.message || data.summary}</p></div>
+        {data.events?.length > 0 && (
           <div>
-            <label className="block text-[11px] font-bold text-galaxy/60 mb-1 flex items-center gap-1"><Folder className="w-3 h-3"/> Simpan ke Project (Opsional)</label>
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="w-full bg-white border border-venus/50 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#1e3a8a] text-galaxy font-medium">
-              <option value="">-- Tidak masuk project --</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><CalendarDays className="w-4 h-4 text-indigo-500"/> Jadwal</h4>
+            <div className="space-y-2">{data.events.map((e: any, i: number) => <div key={i} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-lg text-sm text-indigo-900">📅 {e.title}</div>)}</div>
           </div>
-          <button onClick={handleApprove} disabled={isSaving} className="w-full bg-[#2445B0] text-white py-2.5 rounded-lg font-bold text-xs hover:bg-[#1e3a8a] transition-colors flex items-center justify-center shadow-md">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-            Approve & Save Triage
-          </button>
-        </div>
+        )}
+        {data.tasks?.length > 0 && (
+          <div>
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-blue-500"/> Tugas</h4>
+            <div className="space-y-2">
+              {data.tasks.map((t: any, i: number) => (
+                <div key={i} className="flex items-center justify-between bg-gray-50 border border-gray-100 p-3 rounded-lg">
+                  <div><p className="text-sm font-medium text-gray-800">{t.title}</p>{t.assignee && <p className="text-xs text-gray-500">Ditugaskan: {t.assignee}</p>}</div>
+                  <span className={`px-2 py-1 text-xs font-bold rounded-md ${t.quadrant === 'Q1' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-700'}`}>{t.quadrant}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {(data.tasks?.length > 0 || data.events?.length > 0) && !isSaved && (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex gap-3">
+            <div className="flex-1">
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none">
+                <option value="">-- Tanpa Project --</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <button onClick={handleApprove} disabled={isSaving} className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-600 flex items-center shadow-sm">
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />} Simpan
+            </button>
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="p-4 md:p-8 h-full max-w-5xl mx-auto flex flex-col relative overflow-hidden">
-      
-      <div className="flex items-center gap-4 mb-6 shrink-0">
-        <div className="w-14 h-14 bg-[#1e3a8a] rounded-2xl flex items-center justify-center shadow-lg shadow-[#1e3a8a]/20">
-          <BrainCircuit className="w-8 h-8 text-white" />
+    <div className="flex h-[calc(100vh-2rem)] bg-white text-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+      {/* SIDEBAR AREA */}
+      <div className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out ${isSidebarOpen ? "w-72" : "w-0 border-r-0 overflow-hidden"}`}>
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center w-72 shrink-0">
+          <h2 className="font-bold text-gray-700">LockIn AI</h2>
+          <button onClick={() => setActiveSessionId(null)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="Percakapan Baru"><Plus className="w-4 h-4" /></button>
         </div>
-        <div>
-          <h1 className="text-3xl font-extrabold text-galaxy flex items-center gap-2">
-            Deepgram STT Engine <Sparkles className="w-5 h-5 text-amber-400" />
-          </h1>
-          <p className="text-galaxy/60 text-sm font-medium">Rekam audio Google Meet secara langsung via Screen Share.</p>
+        
+        <div className="p-3 w-72 shrink-0">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+            <input type="text" placeholder="Cari percakapan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-blue-400" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1 w-72 shrink-0 custom-scrollbar">
+          {filteredSessions.map((item) => (
+            <div key={item.id} onClick={() => { if (editingSessionId !== item.id) setActiveSessionId(item.id); }} className={`group relative w-full text-left p-3 rounded-xl transition-all flex items-center justify-between cursor-pointer ${activeSessionId === item.id ? "bg-blue-50 border-blue-200 border text-blue-700" : "hover:bg-gray-100 border border-transparent text-gray-600"}`}>
+              <div className="flex items-center gap-3 overflow-hidden flex-1">
+                <MessageSquare className={`w-4 h-4 shrink-0 ${activeSessionId === item.id ? "text-blue-500" : "text-gray-400"}`} />
+                {editingSessionId === item.id ? (
+                  <input autoFocus type="text" value={editTitleValue} onChange={(e) => setEditTitleValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleRename(item.id); }} className="w-full bg-white border border-blue-300 rounded px-2 py-0.5 text-sm outline-none" />
+                ) : (
+                  <p className="text-sm font-semibold truncate pr-2">{item.title}</p>
+                )}
+              </div>
+              {editingSessionId === item.id ? (
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={(e) => { e.stopPropagation(); handleRename(item.id); }} className="text-green-600 hover:bg-green-100 p-1 rounded"><Check className="w-3.5 h-3.5"/></button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditingSessionId(null); }} className="text-gray-400 hover:bg-gray-200 p-1 rounded"><X className="w-3.5 h-3.5"/></button>
+                </div>
+              ) : (
+                <div className="hidden group-hover:flex items-center gap-1 shrink-0 bg-gradient-to-l from-gray-100 via-gray-100 pl-2">
+                  <button onClick={(e) => { e.stopPropagation(); setEditingSessionId(item.id); setEditTitleValue(item.title); }} className="text-gray-400 hover:text-blue-600 p-1" title="Ganti Nama"><Pencil className="w-3.5 h-3.5"/></button>
+                  <button onClick={(e) => handleDelete(item.id, e)} className="text-gray-400 hover:text-red-600 p-1" title="Hapus Obrolan"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-[24px] border border-venus/50 shadow-sm flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 custom-scrollbar bg-slate-50/50">
-          {isLoadingFetch ? (
-            <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#1e3a8a] animate-spin" /></div>
-          ) : messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center opacity-70">
-              <Bot className="w-16 h-16 text-galaxy/20 mb-4" />
-              <p className="text-galaxy/60 font-bold text-center max-w-md text-sm leading-relaxed">
-                Halo! Tekan tombol Screen Share di bawah, lalu pilih tab Google Meet kamu. Pastikan untuk mencentang <span className="font-extrabold">"Share tab audio"</span> agar aku bisa merekam percakapan klien dan merangkumnya untukmu.
-              </p>
+      <div className="flex-1 flex flex-col relative bg-white min-w-0 pb-32">
+        <div className="absolute top-4 left-4 z-10"><button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-white border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 shadow-sm">{isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}</button></div>
+
+        {/* MAIN CHAT AREA */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col gap-8 custom-scrollbar">
+          {sessionChats.length === 0 && !activeSessionId ? (
+            <div className="h-full flex flex-col items-center justify-center text-center transform -translate-y-10">
+              <Image src="/logo_Lockin.png" alt="LockIn" width={64} height={64} className="mb-6 opacity-80" />
+              <h1 className="text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-gray-700 to-gray-900">Halo, Arsitek.</h1>
+              <p className="text-gray-400 mt-4 max-w-md">Kirimkan instruksi atau rekam meeting. Percakapan ini akan tersimpan berkelanjutan dalam satu sesi.</p>
             </div>
           ) : (
-            messages.map((msg, idx) => {
-              let triageData = null;
-              let normalText = msg.response;
-              
-              if (!msg.isTemporary) {
-                try {
-                  const parsed = JSON.parse(msg.response);
-                  if (parsed.isTriage) triageData = parsed;
-                  else normalText = parsed.message || msg.response;
-                } catch (e) {}
-              }
-
-              return (
+            <div className="max-w-4xl mx-auto w-full space-y-8 mt-10">
+              {sessionChats.map((chat, idx) => (
                 <div key={idx} className="space-y-6">
-                  <div className="flex justify-end gap-4">
-                    <div className="max-w-[80%] bg-[#1e3a8a] text-white p-4 rounded-2xl rounded-tr-none shadow-sm text-sm font-medium leading-relaxed">
-                      {msg.prompt}
+                  {chat.prompt && (
+                    <div className="flex gap-4">
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><User className="w-4 h-4 text-blue-700"/></div>
+                      <div className="flex-1"><p className="text-sm font-bold text-gray-800 mb-1">Anda</p><div className="text-gray-700 bg-gray-50 border border-gray-200 p-4 rounded-2xl rounded-tl-none w-fit max-w-[90%] whitespace-pre-wrap">{chat.prompt}</div></div>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-planetary/10 border border-planetary/30 flex items-center justify-center shrink-0">
-                      <User className="w-4 h-4 text-planetary" />
+                  )}
+                  {chat.triageData && (
+                    <div className="flex gap-4">
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center"><Image src="/logo_Lockin.png" alt="AI" width={16} height={16} className="invert"/></div>
+                      <div className="flex-1"><p className="text-sm font-bold text-gray-800 mb-1">LockIn AI</p><TriageCard data={chat.triageData} /></div>
                     </div>
-                  </div>
-
-                  <div className="flex justify-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
-                      <Bot className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div className="max-w-[90%]">
-                      {msg.isTemporary ? (
-                        <div className="bg-white border border-venus/60 p-4 rounded-2xl rounded-tl-none shadow-sm text-sm text-galaxy/40 font-medium flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" /> Sedang menganalisis struktur meeting...
-                        </div>
-                      ) : triageData ? (
-                        <TriageCard data={triageData} msgIndex={idx} />
-                      ) : (
-                        <div className="bg-white border border-venus/60 p-4 rounded-2xl rounded-tl-none shadow-sm text-sm text-galaxy/80 font-medium whitespace-pre-wrap">
-                          {normalText}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )
-            })
+              ))}
+              {isProcessing && (
+                 <div className="flex gap-4">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center"><Image src="/logo_Lockin.png" alt="AI" width={16} height={16} className="invert"/></div>
+                    <div className="flex items-center gap-2 text-gray-500 bg-gray-50 p-4 rounded-2xl rounded-tl-none border border-gray-100 w-fit"><div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div> Memproses...</div>
+                 </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT & RECORD AREA */}
-        <div className="p-4 bg-white border-t border-venus/50 shrink-0">
-          <form onSubmit={handleSend} className="relative flex items-end gap-3 max-w-4xl mx-auto">
-            
-            {/* TOMBOL DEEPGRAM SCREEN SHARE */}
-            <button 
-              type="button" 
-              onClick={toggleListening}
-              disabled={connectionStatus === "connecting"}
-              className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-md border ${
-                isListening 
-                ? 'bg-red-500 text-white border-red-600 animate-pulse' 
-                : connectionStatus === "connecting"
-                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-wait'
-                : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
-              }`}
-              title={isListening ? "Hentikan Perekaman" : "Mulai Screen Share Audio"}
-            >
-              {connectionStatus === "connecting" ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isListening ? (
-                <Square className="w-5 h-5 fill-current" />
-              ) : (
-                <ScreenShare className="w-5 h-5" />
-              )}
-            </button>
+        {/* INPUT AREA (MIC & SCREEN SHARE) */}
+        <div className="p-6 bg-white absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-10">
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-gray-50 border border-gray-300 rounded-3xl flex items-center px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all gap-2">
+              <button onClick={() => isRecording && recordMode === "mic" ? handleStopRecording() : handleStartRecording("mic")} disabled={isProcessing} className={`p-2.5 rounded-full ${isRecording && recordMode === "mic" ? "bg-red-100 text-red-600 ring-2 ring-red-400" : "bg-white border text-gray-500 hover:text-blue-600"}`}>
+                {isRecording && recordMode === "mic" ? <StopCircle className="w-5 h-5"/> : <Mic className="w-5 h-5"/>}
+              </button>
+              
+              <button onClick={() => isRecording && recordMode === "screen" ? handleStopRecording() : handleStartRecording("screen")} disabled={isProcessing} className={`p-2.5 rounded-full ${isRecording && recordMode === "screen" ? "bg-red-100 text-red-600 ring-2 ring-red-400" : "bg-white border text-gray-500 hover:text-blue-600"}`}>
+                {isRecording && recordMode === "screen" ? <StopCircle className="w-5 h-5"/> : <MonitorUp className="w-5 h-5"/>}
+              </button>
 
-            <textarea
-              value={inputData} onChange={(e) => setInputData(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={
-                connectionStatus === "connecting" ? "Menghubungkan ke Deepgram..." :
-                isListening ? "Merekam suara dari Tab (Bicara atau putar audio)..." : 
-                "Ketik manual atau klik ikon Screen Share untuk merekam meeting online..."
-              }
-              className={`w-full border rounded-2xl pl-4 pr-14 py-4 text-sm focus:ring-2 focus:ring-[#1e3a8a]/30 transition-all text-slate-800 outline-none resize-none custom-scrollbar ${isListening ? 'bg-red-50/50 border-red-200' : 'bg-[#f1f5f9] border-transparent focus:bg-white'}`}
-              rows={2} style={{ minHeight: '56px', maxHeight: '120px' }}
-            />
-            
-            <button type="submit" disabled={isPending || (!inputData.trim() && !isListening)} className="absolute right-3 bottom-2 w-10 h-10 bg-[#1e3a8a] text-white rounded-xl flex items-center justify-center hover:bg-planetary transition-colors disabled:opacity-50">
-              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
-            </button>
-          </form>
+              <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') processMessage(inputText); }} placeholder="Kirim pesan ke LockIn AI..." className="flex-1 bg-transparent outline-none text-gray-800 placeholder-gray-400 px-2" disabled={isProcessing}/>
+              <button onClick={() => processMessage(inputText)} disabled={isProcessing || !inputText.trim()} className={`p-2.5 rounded-full ${isProcessing || !inputText.trim() ? "bg-gray-300 text-gray-500" : "bg-gray-900 text-white hover:bg-blue-600"}`}><Send className="w-5 h-5 ml-0.5" /></button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
