@@ -1,16 +1,25 @@
 "use server";
 
 import { PrismaClient } from "@prisma/client";
+import { cookies } from "next/headers"; // <-- TAMBAHAN WAJIB
+
 const prisma = new PrismaClient();
 
 // ==========================================
-// 1. MENDAPATKAN USER ID
+// 1. MENDAPATKAN USER ID DARI SESSION LOGIN
 // ==========================================
 const getUserId = async () => {
   try {
-    const anyUser = await prisma.user.findFirst();
-    return anyUser ? anyUser.id : null;
-  } catch (e) { return null; }
+    const cookieStore = await cookies();
+    const currentUserId = cookieStore.get("lockin_user_id")?.value;
+    
+    if (!currentUserId) {
+      return null;
+    }
+    return currentUserId;
+  } catch (e) { 
+    return null; 
+  }
 };
 
 // ==========================================
