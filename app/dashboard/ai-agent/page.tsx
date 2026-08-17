@@ -273,18 +273,58 @@ export default function AIAgentWorkspace() {
             <div className="max-w-4xl mx-auto w-full space-y-8 mt-10">
               {sessionChats.map((chat, idx) => (
                 <div key={idx} className="space-y-6">
+                  
+                  {/* BUBBLE USER DENGAN TOMBOL EDIT */}
                   {chat.prompt && (
-                    <div className="flex gap-4">
-                      <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><User className="w-4 h-4 text-blue-700"/></div>
-                      <div className="flex-1"><p className="text-sm font-bold text-gray-800 mb-1">Anda</p><div className="text-gray-700 bg-gray-50 border border-gray-200 p-4 rounded-2xl rounded-tl-none w-fit max-w-[90%] whitespace-pre-wrap">{chat.prompt}</div></div>
+                    <div className="flex gap-4 group">
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-700"/>
+                      </div>
+                      <div className="flex-1 flex items-end gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-gray-800 mb-1">Anda</p>
+                          <div className="text-gray-700 bg-gray-50 border border-gray-200 p-4 rounded-2xl rounded-tl-none w-fit max-w-[100%] whitespace-pre-wrap">
+                            {chat.prompt}
+                          </div>
+                        </div>
+                        {/* Tombol Edit (Hanya Muncul saat di-Hover) */}
+                        <button 
+                          onClick={() => setInputText(chat.prompt || "")} 
+                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-full shadow-sm transition-all duration-200" 
+                          title="Edit Pesan"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
+
+                  {/* BUBBLE AI DENGAN TOMBOL REGENERATE */}
                   {chat.triageData && (
-                    <div className="flex gap-4">
-                      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center"><Image src="/logo_Lockin.png" alt="AI" width={16} height={16} className="invert"/></div>
-                      <div className="flex-1"><p className="text-sm font-bold text-gray-800 mb-1">LockIn AI</p><TriageCard data={chat.triageData} /></div>
+                    <div className="flex gap-4 group">
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center">
+                        <Image src="/logo_Lockin.png" alt="AI" width={16} height={16} className="invert"/>
+                      </div>
+                      <div className="flex-1 flex items-start gap-2">
+                        <div className="w-full">
+                          <p className="text-sm font-bold text-gray-800 mb-1">LockIn AI</p>
+                          <TriageCard data={chat.triageData} />
+                        </div>
+                        {/* Tombol Regenerate (Hanya Muncul saat di-Hover) */}
+                        <button 
+                          onClick={() => {
+                            const prevPrompt = chat.prompt || (idx > 0 ? sessionChats[idx-1].prompt : "");
+                            if (prevPrompt) processMessage(prevPrompt);
+                          }} 
+                          className="opacity-0 group-hover:opacity-100 mt-6 p-2 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-full shadow-sm transition-all duration-200 shrink-0" 
+                          title="Generate Ulang"
+                        >
+                          <RotateCw className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
+                  
                 </div>
               ))}
               {isProcessing && (
