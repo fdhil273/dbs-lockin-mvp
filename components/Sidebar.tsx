@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -14,12 +14,22 @@ import {
   Settings, 
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Menu, // Icon Hamburger untuk HP
+  X     // Icon Close untuk HP
 } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // STATE BARU KHUSUS MOBILE
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Tutup sidebar otomatis di HP kalau user mengklik menu (pindah halaman)
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname]);
 
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -31,68 +41,95 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside 
-      className={`relative h-screen bg-planetary text-milkyway hidden md:flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out ${
-        isCollapsed ? "w-20" : "w-64"
-      }`}
-    >
+    <>
+      {/* 1. TOMBOL MENU MENGAMBANG (FAB) KHUSUS HP (Kanan Bawah) */}
       <button 
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-10 bg-white text-planetary w-6 h-6 rounded-full border border-venus/50 flex items-center justify-center shadow-md hover:scale-110 transition-transform z-50"
+        onClick={() => setIsMobileOpen(true)}
+        className={`md:hidden fixed bottom-6 right-6 z-[60] p-4 bg-blue-600 text-white rounded-full shadow-2xl active:scale-95 transition-transform ${isMobileOpen ? "hidden" : "flex"}`}
       >
-        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        <Menu className="w-6 h-6" />
       </button>
 
-      <div>
-        <div className={`flex items-center justify-center border-b border-white/10 mb-6 transition-all duration-300 ${isCollapsed ? "h-20" : "h-24 flex-col"}`}>
-          <Image src="/logo_Lockin.png" alt="LockIn Logo" width={isCollapsed ? 28 : 36} height={isCollapsed ? 28 : 36} className={`object-contain transition-all duration-300 ${isCollapsed ? "" : "mb-2"}`} />
-          {!isCollapsed && <span className="text-xl font-bold tracking-widest text-sky uppercase animate-in fade-in duration-300">LockIn</span>}
-        </div>
-        
-        <nav className="px-3 space-y-2">
-          {menuItems.map((item) => {
-            // PERBAIKAN BUG TAB GANDA DI SINI
-            const isActive = item.path === '/dashboard' 
-              ? pathname === '/dashboard' // Khusus Dashboard harus persis
-              : pathname.startsWith(item.path);
+      {/* 2. OVERLAY GELAP KHUSUS HP (Efek Blur di belakang Sidebar) */}
+      {isMobileOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm transition-opacity" 
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
 
-            return (
-              <Link 
-                key={item.name} href={item.path} title={isCollapsed ? item.name : ""}
-                className={`flex items-center py-3 rounded-xl font-medium transition-all duration-200 ${isCollapsed ? "justify-center px-0" : "px-4"} ${isActive ? "bg-white/15 text-white shadow-sm" : "text-sky/70 hover:bg-white/5 hover:text-white"}`}
-              >
-                <item.icon className={`w-5 h-5 ${isCollapsed ? "" : "mr-4"} shrink-0 ${isActive ? "text-white" : "text-sky/70"}`} />
-                {!isCollapsed && <span className="animate-in fade-in duration-300 whitespace-nowrap">{item.name}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      <div className="p-3">
-        {/* PERBAIKAN: Mengubah div menjadi Link agar mengarah ke halaman settings */}
-        <Link 
-          href="/dashboard/settings" 
-          title={isCollapsed ? "Pengaturan" : ""}
-          className={`bg-white/10 rounded-2xl flex items-center group hover:bg-white/15 transition-colors cursor-pointer mb-2 ${isCollapsed ? "p-2 justify-center" : "p-3 justify-between"}`}
+      {/* 3. SIDEBAR UTAMA */}
+      {/* Di HP: Jadi Fixed (Melayang), Di Laptop: Jadi Relative (Normal) */}
+      <aside 
+        className={`fixed md:relative top-0 left-0 z-[70] h-[100dvh] bg-planetary text-milkyway flex flex-col justify-between shrink-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+        ${isCollapsed ? "w-20" : "w-64"} 
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        {/* Tombol Tutup Khusus HP di dalam Sidebar */}
+        <button 
+          onClick={() => setIsMobileOpen(false)}
+          className="md:hidden absolute top-4 right-4 p-2 text-white/50 hover:text-white"
         >
-          <div className="flex items-center overflow-hidden">
-            <div className="w-10 h-10 rounded-full bg-milkyway text-planetary flex items-center justify-center font-bold text-lg shrink-0">F</div>
-            {!isCollapsed && (
-              <div className="ml-3 truncate animate-in fade-in duration-300">
-                <p className="text-sm font-bold text-white truncate">fdhil273</p>
-                <p className="text-[10px] text-sky/70 truncate uppercase tracking-wider">Product Manager</p>
-              </div>
-            )}
+          <X className="w-6 h-6" />
+        </button>
+
+        {/* Tombol Collapse Desktop (Tetap Sama) */}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden md:flex absolute -right-3 top-10 bg-white text-planetary w-6 h-6 rounded-full border border-venus/50 items-center justify-center shadow-md hover:scale-110 transition-transform z-50"
+        >
+          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
+        <div>
+          <div className={`flex items-center justify-center border-b border-white/10 mb-6 transition-all duration-300 mt-6 md:mt-0 ${isCollapsed ? "h-20" : "h-24 flex-col"}`}>
+            <Image src="/logo_Lockin.png" alt="LockIn Logo" width={isCollapsed ? 28 : 36} height={isCollapsed ? 28 : 36} className={`object-contain transition-all duration-300 ${isCollapsed ? "" : "mb-2"}`} />
+            {!isCollapsed && <span className="text-xl font-bold tracking-widest text-sky uppercase animate-in fade-in duration-300">LockIn</span>}
           </div>
-          {!isCollapsed && <Settings className="w-4 h-4 text-sky/70 group-hover:text-white shrink-0 ml-2" />}
-        </Link>
-        
-        <Link href="/" title={isCollapsed ? "Logout" : ""} className={`w-full flex items-center py-3 text-sky/70 hover:bg-red-500/20 hover:text-red-300 rounded-xl font-medium transition-colors ${isCollapsed ? "justify-center px-0" : "px-4 justify-center"}`}>
-          <LogOut className={`w-5 h-5 ${isCollapsed ? "" : "mr-3"} shrink-0`} />
-          {!isCollapsed && <span className="animate-in fade-in duration-300 whitespace-nowrap">Logout</span>}
-        </Link>
-      </div>
-    </aside>
+          
+          <nav className="px-3 space-y-2 overflow-y-auto max-h-[60vh] custom-scrollbar">
+            {menuItems.map((item) => {
+              const isActive = item.path === '/dashboard' 
+                ? pathname === '/dashboard' 
+                : pathname.startsWith(item.path);
+
+              return (
+                <Link 
+                  key={item.name} href={item.path} title={isCollapsed ? item.name : ""}
+                  className={`flex items-center py-3 rounded-xl font-medium transition-all duration-200 ${isCollapsed ? "justify-center px-0" : "px-4"} ${isActive ? "bg-white/15 text-white shadow-sm" : "text-sky/70 hover:bg-white/5 hover:text-white"}`}
+                >
+                  <item.icon className={`w-5 h-5 ${isCollapsed ? "" : "mr-4"} shrink-0 ${isActive ? "text-white" : "text-sky/70"}`} />
+                  {!isCollapsed && <span className="animate-in fade-in duration-300 whitespace-nowrap">{item.name}</span>}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="p-3 mb-4 md:mb-0">
+          <Link 
+            href="/dashboard/settings" 
+            title={isCollapsed ? "Pengaturan" : ""}
+            className={`bg-white/10 rounded-2xl flex items-center group hover:bg-white/15 transition-colors cursor-pointer mb-2 ${isCollapsed ? "p-2 justify-center" : "p-3 justify-between"}`}
+          >
+            <div className="flex items-center overflow-hidden">
+              <div className="w-10 h-10 rounded-full bg-milkyway text-planetary flex items-center justify-center font-bold text-lg shrink-0">F</div>
+              {!isCollapsed && (
+                <div className="ml-3 truncate animate-in fade-in duration-300">
+                  <p className="text-sm font-bold text-white truncate">fdhil273</p>
+                  <p className="text-[10px] text-sky/70 truncate uppercase tracking-wider">Product Manager</p>
+                </div>
+              )}
+            </div>
+            {!isCollapsed && <Settings className="w-4 h-4 text-sky/70 group-hover:text-white shrink-0 ml-2" />}
+          </Link>
+          
+          <Link href="/" title={isCollapsed ? "Logout" : ""} className={`w-full flex items-center py-3 text-sky/70 hover:bg-red-500/20 hover:text-red-300 rounded-xl font-medium transition-colors ${isCollapsed ? "justify-center px-0" : "px-4 justify-center"}`}>
+            <LogOut className={`w-5 h-5 ${isCollapsed ? "" : "mr-3"} shrink-0`} />
+            {!isCollapsed && <span className="animate-in fade-in duration-300 whitespace-nowrap">Logout</span>}
+          </Link>
+        </div>
+      </aside>
+    </>
   );
 }
