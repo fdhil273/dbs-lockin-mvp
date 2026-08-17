@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -15,14 +15,20 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  User
+  Menu,
+  X
 } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Menu untuk Desktop
+  // Tutup sidebar mobile otomatis saat pindah halaman
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname]);
+
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { name: "Task Matrix", icon: CheckSquare, path: "/dashboard/task" },
@@ -34,68 +40,51 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ========================================================= */}
-      {/* 1. MOBILE BOTTOM NAVIGATION (HANYA MUNCUL DI HP)          */}
-      {/* ========================================================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-[80] px-8 py-5 flex justify-between items-center">
-        
-        {/* Kiri: Dashboard & Jadwal */}
-        <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="relative group">
-            <LayoutDashboard className={`w-6 h-6 transition-colors ${pathname === '/dashboard' ? 'text-[#1e2a5e]' : 'text-gray-300'}`} />
-            {pathname === '/dashboard' && <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1e2a5e] rounded-full"></span>}
-          </Link>
-          <Link href="/dashboard/jadwal" className="relative group">
-            <Calendar className={`w-6 h-6 transition-colors ${pathname.startsWith('/dashboard/jadwal') ? 'text-[#1e2a5e]' : 'text-gray-300'}`} />
-            {pathname.startsWith('/dashboard/jadwal') && <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1e2a5e] rounded-full"></span>}
-          </Link>
-        </div>
-
-        {/* TENGAH: Tombol AI Agent Melayang (Ala Referensi UI) */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-7">
-          <Link 
-            href="/dashboard/ai-agent" 
-            className="w-16 h-16 bg-[#ffad4d] rounded-full flex items-center justify-center shadow-xl shadow-orange-500/30 hover:scale-105 transition-transform border-[6px] border-[#f8fafc]"
-          >
-            <BrainCircuit className="w-7 h-7 text-white" />
-          </Link>
-        </div>
-
-        {/* Kanan: Task Matrix & Settings/Profil */}
-        <div className="flex items-center gap-8">
-          <Link href="/dashboard/task" className="relative group">
-            <CheckSquare className={`w-6 h-6 transition-colors ${pathname.startsWith('/dashboard/task') ? 'text-[#1e2a5e]' : 'text-gray-300'}`} />
-            {pathname.startsWith('/dashboard/task') && <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1e2a5e] rounded-full"></span>}
-          </Link>
-          <Link href="/dashboard/settings" className="relative group">
-            <User className={`w-6 h-6 transition-colors ${pathname.startsWith('/dashboard/settings') ? 'text-[#1e2a5e]' : 'text-gray-300'}`} />
-            {pathname.startsWith('/dashboard/settings') && <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1e2a5e] rounded-full"></span>}
-          </Link>
-        </div>
-      </nav>
-
-      {/* ========================================================= */}
-      {/* 2. SIDEBAR DESKTOP (TIDAK BERUBAH)                        */}
-      {/* ========================================================= */}
-      <aside 
-        className={`relative h-screen bg-planetary text-milkyway hidden md:flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out ${
-          isCollapsed ? "w-20" : "w-64"
-        }`}
+      {/* TOMBOL HAMBURGER MENGAMBANG DI HP (Aman di pojok kanan bawah) */}
+      <button 
+        onClick={() => setIsMobileOpen(true)}
+        className={`md:hidden fixed bottom-6 right-6 z-[90] p-4 bg-[#1e2a5e] text-white rounded-full shadow-2xl active:scale-95 transition-all ${isMobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
+        <Menu className="w-6 h-6" />
+      </button>
+
+      {/* OVERLAY GELAP SAAT MENU HP TERBUKA */}
+      {isMobileOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/60 z-[95] backdrop-blur-sm transition-opacity" 
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR UTAMA */}
+      <aside 
+        className={`fixed md:relative top-0 left-0 z-[100] h-[100dvh] bg-planetary text-milkyway flex flex-col justify-between shrink-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+        ${isCollapsed ? "w-20" : "w-64"} 
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        {/* Tombol Tutup Khusus HP */}
+        <button 
+          onClick={() => setIsMobileOpen(false)}
+          className="md:hidden absolute top-4 right-4 p-2 text-white/50 hover:text-white"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        {/* Tombol Collapse Desktop */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-10 bg-white text-planetary w-6 h-6 rounded-full border border-venus/50 flex items-center justify-center shadow-md hover:scale-110 transition-transform z-50"
+          className="hidden md:flex absolute -right-3 top-10 bg-white text-planetary w-6 h-6 rounded-full border border-venus/50 items-center justify-center shadow-md hover:scale-110 transition-transform z-50"
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
 
         <div>
-          <div className={`flex items-center justify-center border-b border-white/10 mb-6 transition-all duration-300 ${isCollapsed ? "h-20" : "h-24 flex-col"}`}>
+          <div className={`flex items-center justify-center border-b border-white/10 mb-6 transition-all duration-300 mt-6 md:mt-0 ${isCollapsed ? "h-20" : "h-24 flex-col"}`}>
             <Image src="/logo_Lockin.png" alt="LockIn Logo" width={isCollapsed ? 28 : 36} height={isCollapsed ? 28 : 36} className={`object-contain transition-all duration-300 ${isCollapsed ? "" : "mb-2"}`} />
             {!isCollapsed && <span className="text-xl font-bold tracking-widest text-sky uppercase animate-in fade-in duration-300">LockIn</span>}
           </div>
           
-          <nav className="px-3 space-y-2">
+          <nav className="px-3 space-y-2 overflow-y-auto max-h-[60vh] custom-scrollbar">
             {menuItems.map((item) => {
               const isActive = item.path === '/dashboard' 
                 ? pathname === '/dashboard' 
@@ -114,7 +103,7 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        <div className="p-3">
+        <div className="p-3 mb-4 md:mb-0">
           <Link 
             href="/dashboard/settings" 
             title={isCollapsed ? "Pengaturan" : ""}
