@@ -23,7 +23,7 @@ export default function SettingsPage() {
       const user = await getUserProfile();
       if (user) {
         setFormData({
-          name: user.name || user.username || "Pengguna", 
+          name: user.name || "Pengguna",
           email: user.email || "",
           birthDate: user.birthDate || "Belum diatur",
           password: "••••••••"
