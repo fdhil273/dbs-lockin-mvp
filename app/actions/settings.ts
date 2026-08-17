@@ -1,14 +1,25 @@
 "use server";
 
 import { PrismaClient } from "@prisma/client";
+import { cookies } from "next/headers";
+
 const prisma = new PrismaClient();
 
-// Ambil ID User yang sedang aktif
+// Ambil ID User yang sedang aktif (Membaca session cookie)
 const getUserId = async () => {
   try {
-    const anyUser = await prisma.user.findFirst();
-    return anyUser ? anyUser.id : null;
-  } catch (e) { return null; }
+    const cookieStore = await cookies();
+    // Kunci cookie disamakan dengan yang ada di dashboard
+    const currentUserId = cookieStore.get("lockin_user_id")?.value;
+
+    if (!currentUserId) {
+      return null;
+    }
+
+    return currentUserId;
+  } catch (e) { 
+    return null; 
+  }
 };
 
 // Mengambil Data Profil

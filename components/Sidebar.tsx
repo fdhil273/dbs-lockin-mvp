@@ -24,9 +24,39 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Tutup sidebar mobile otomatis saat pindah halaman
+  // STATE UNTUK DATA USER DINAMIS
+  const [userName, setUserName] = useState("Memuat...");
+  const [userInitial, setUserInitial] = useState("-");
+  const [userRole, setUserRole] = useState("MEMBER"); 
+
+  // AMBIL DATA DARI DATABASE SAAT SIDEBAR MUNCUL
   useEffect(() => {
-    setIsMobileOpen(false);
+    setIsMobileOpen(false); // Tutup sidebar mobile otomatis saat pindah halaman
+    
+    const fetchUser = async () => {
+      try {
+        const { getUserProfile } = await import("@/app/actions/settings");
+        const user = await getUserProfile();
+        
+        if (user) {
+          const name = user.name || "Pengguna";
+          setUserName(name);
+          setUserInitial(name.charAt(0).toUpperCase());
+          // Menarik role dari database (default ke "MEMBER" jika kosong)
+          setUserRole(user.role || "MEMBER"); 
+        } else {
+          setUserName("Tamu");
+          setUserInitial("T");
+          setUserRole("-");
+        }
+      } catch (error) {
+        setUserName("User");
+        setUserInitial("U");
+        setUserRole("MEMBER");
+      }
+    };
+    
+    fetchUser();
   }, [pathname]);
 
   const menuItems = [
@@ -40,7 +70,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* TOMBOL HAMBURGER MENGAMBANG DI HP (Aman di pojok kanan bawah) */}
+      {/* TOMBOL HAMBURGER MENGAMBANG DI HP */}
       <button 
         onClick={() => setIsMobileOpen(true)}
         className={`md:hidden fixed bottom-6 right-6 z-[90] p-4 bg-[#1e2a5e] text-white rounded-full shadow-2xl active:scale-95 transition-all ${isMobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}
@@ -62,7 +92,6 @@ export default function Sidebar() {
         ${isCollapsed ? "w-20" : "w-64"} 
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-        {/* Tombol Tutup Khusus HP */}
         <button 
           onClick={() => setIsMobileOpen(false)}
           className="md:hidden absolute top-4 right-4 p-2 text-white/50 hover:text-white"
@@ -70,7 +99,6 @@ export default function Sidebar() {
           <X className="w-6 h-6" />
         </button>
 
-        {/* Tombol Collapse Desktop */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="hidden md:flex absolute -right-3 top-10 bg-white text-planetary w-6 h-6 rounded-full border border-venus/50 items-center justify-center shadow-md hover:scale-110 transition-transform z-50"
@@ -110,11 +138,15 @@ export default function Sidebar() {
             className={`bg-white/10 rounded-2xl flex items-center group hover:bg-white/15 transition-colors cursor-pointer mb-2 ${isCollapsed ? "p-2 justify-center" : "p-3 justify-between"}`}
           >
             <div className="flex items-center overflow-hidden">
-              <div className="w-10 h-10 rounded-full bg-milkyway text-planetary flex items-center justify-center font-bold text-lg shrink-0">F</div>
+              {/* INISIAL DINAMIS */}
+              <div className="w-10 h-10 rounded-full bg-milkyway text-planetary flex items-center justify-center font-bold text-lg shrink-0">
+                {userInitial}
+              </div>
               {!isCollapsed && (
                 <div className="ml-3 truncate animate-in fade-in duration-300">
-                  <p className="text-sm font-bold text-white truncate">fdhil273</p>
-                  <p className="text-[10px] text-sky/70 truncate uppercase tracking-wider">Product Manager</p>
+                  {/* NAMA DAN ROLE DINAMIS */}
+                  <p className="text-sm font-bold text-white truncate">{userName}</p>
+                  <p className="text-[10px] text-sky/70 truncate uppercase tracking-wider">{userRole}</p>
                 </div>
               )}
             </div>

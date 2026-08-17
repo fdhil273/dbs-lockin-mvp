@@ -13,6 +13,7 @@ model User {
   email         String          @unique
   name          String?
   birthDate     String?
+  role          String?         @default("MEMBER")
   password      String          
   projectsOwned Project[]       @relation("ProjectOwner")
   memberships   ProjectMember[]
